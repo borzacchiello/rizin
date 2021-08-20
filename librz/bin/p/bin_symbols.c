@@ -120,6 +120,7 @@ static SymbolsMetadata parseMetadata(RzBuffer *buf, int off) {
 }
 
 static RzBinSection *bin_section_from_section(RzCoreSymCacheElementSection *sect) {
+	rz_return_val_if_fail(sect, NULL);
 	if (!sect->name) {
 		return NULL;
 	}
@@ -138,6 +139,7 @@ static RzBinSection *bin_section_from_section(RzCoreSymCacheElementSection *sect
 }
 
 static RzBinSection *bin_section_from_segment(RzCoreSymCacheElementSegment *seg) {
+	rz_return_val_if_fail(seg, NULL);
 	if (!seg->name) {
 		return NULL;
 	}
@@ -299,12 +301,18 @@ static RzList *sections(RzBinFile *bf) {
 	rz_return_val_if_fail(res && bf->o && bf->o->bin_obj, res);
 	RzCoreSymCacheElement *element = bf->o->bin_obj;
 	size_t i;
+	if (!element->segments) {
+		return NULL;
+	}
 	for (i = 0; i < element->hdr->n_segments; i++) {
 		RzCoreSymCacheElementSegment *seg = &element->segments[i];
 		RzBinSection *s = bin_section_from_segment(seg);
 		if (s) {
 			rz_list_append(res, s);
 		}
+	}
+	if (!element->sections) {
+		return NULL;
 	}
 	for (i = 0; i < element->hdr->n_sections; i++) {
 		RzCoreSymCacheElementSection *sect = &element->sections[i];
@@ -354,6 +362,9 @@ static RzList *symbols(RzBinFile *bf) {
 		return res;
 	}
 	bool found = false;
+	if (!element->lined_symbols) {
+		return NULL;
+	}
 	for (i = 0; i < element->hdr->n_lined_symbols; i++) {
 		RzCoreSymCacheElementSymbol *sym = (RzCoreSymCacheElementSymbol *)&element->lined_symbols[i];
 		ht_uu_find(hash, sym->paddr, &found);
