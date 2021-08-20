@@ -32,6 +32,17 @@
 #include <mach-o/nlist.h>
 #endif
 
+#if HAVE_OPENPTY && HAVE_FORKPTY && HAVE_LOGIN_TTY
+#if defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#include <util.h>
+#elif defined(__FreeBSD__) || defined(__DragonFly__)
+#include <libutil.h>
+#else
+#include <pty.h>
+#include <utmp.h>
+#endif
+#endif
+
 #if __UNIX__
 #include <sys/ioctl.h>
 #include <sys/resource.h>
@@ -42,14 +53,9 @@
 #endif
 #if __linux__ && !__ANDROID__
 #include <sys/personality.h>
-#include <pty.h>
-#include <utmp.h>
 #endif
-#if defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
-#include <util.h>
-#elif defined(__FreeBSD__) || defined(__DragonFly__)
+#if defined(__FreeBSD__) || defined(__DragonFly__)
 #include <sys/sysctl.h>
-#include <libutil.h>
 #endif
 #endif
 #ifdef _MSC_VER
@@ -58,14 +64,7 @@
 #define pid_t int
 #endif
 
-#if EMSCRIPTEN
-#undef HAVE_PTY
-#define HAVE_PTY 0
-#else
-#define HAVE_PTY __UNIX__ && !__ANDROID__ && HAVE_FORK && !__sun
-#endif
-
-#if HAVE_PTY
+#if HAVE_OPENPTY && HAVE_FORKPTY && HAVE_LOGIN_TTY
 static int (*dyn_openpty)(int *amaster, int *aslave, char *name, struct termios *termp, struct winsize *winp) = NULL;
 static int (*dyn_login_tty)(int fd) = NULL;
 static id_t (*dyn_forkpty)(int *amaster, char *name, struct termios *termp, struct winsize *winp) = NULL;
@@ -282,7 +281,7 @@ static void setASLR(RzRunProfile *r, int enabled) {
 
 #if __APPLE__ && !__POWERPC__
 #else
-#if HAVE_PTY
+#if HAVE_OPENPTY && HAVE_FORKPTY && HAVE_LOGIN_TTY
 static void restore_saved_fd(int saved, bool restore, int fd) {
 	if (saved == -1) {
 		return;
@@ -295,7 +294,7 @@ static void restore_saved_fd(int saved, bool restore, int fd) {
 #endif
 
 static int handle_redirection_proc(const char *cmd, bool in, bool out, bool err) {
-#if HAVE_PTY
+#if HAVE_OPENPTY && HAVE_FORKPTY && HAVE_LOGIN_TTY
 	if (!dyn_forkpty) {
 		// No forkpty api found, maybe we should fallback to just fork without any pty allocated
 		return -1;
@@ -669,7 +668,7 @@ RZ_API const char *rz_run_help(void) {
 	       "# nice=5\n";
 }
 
-#if HAVE_PTY
+#if HAVE_OPENPTY && HAVE_FORKPTY && HAVE_LOGIN_TTY
 static int fd_forward(int in_fd, int out_fd, char **buff) {
 	int size = 0;
 
@@ -720,7 +719,7 @@ static RzThreadFunctionRet exit_process(RzThread *th) {
 #endif
 
 static int redirect_socket_to_pty(RzSocket *sock) {
-#if HAVE_PTY
+#if HAVE_OPENPTY && HAVE_FORKPTY && HAVE_LOGIN_TTY
 	// directly duplicating the fds using dup2() creates problems
 	// in case of interactive applications
 	int fdm, fds;
@@ -800,7 +799,7 @@ static int redirect_socket_to_pty(RzSocket *sock) {
 RZ_API int rz_run_config_env(RzRunProfile *p) {
 	int ret;
 
-#if HAVE_PTY
+#if HAVE_OPENPTY && HAVE_FORKPTY && HAVE_LOGIN_TTY
 	dyn_init();
 #endif
 
